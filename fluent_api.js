@@ -147,6 +147,7 @@ var View = function(collection, obj) {
 
       if(_obj.sort) _obj.command['sort'] = _obj.sort;
       if(_obj.fields) _obj.command['fields'] = _obj.fields;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";
     }
@@ -181,6 +182,7 @@ var View = function(collection, obj) {
       if(_obj.sort) _obj.command['sort'] = _obj.sort;
       if(_obj.fields) _obj.command['fields'] = _obj.fields;
       if(typeof _obj.upsert == 'boolean') _obj.command['upsert'] = _obj.upsert;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";      
     }
@@ -200,6 +202,7 @@ var View = function(collection, obj) {
       if(_obj.sort) _obj.command['sort'] = _obj.sort;
       if(_obj.fields) _obj.command['fields'] = _obj.fields;
       if(typeof _obj.upsert == 'boolean') _obj.command['upsert'] = _obj.upsert;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";            
     }
@@ -218,6 +221,7 @@ var View = function(collection, obj) {
       if(_obj.sort) _obj.command['sort'] = _obj.sort;
       if(_obj.fields) _obj.command['fields'] = _obj.fields;
       if(typeof _obj.upsert == 'boolean') _obj.command['upsert'] = _obj.upsert;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";      
     }    
@@ -237,6 +241,7 @@ var View = function(collection, obj) {
       if(_obj.sort) _obj.command['sort'] = _obj.sort;
       if(_obj.fields) _obj.command['fields'] = _obj.fields;
       if(typeof _obj.upsert == 'boolean') _obj.command['upsert'] = _obj.upsert;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";      
     }
@@ -253,6 +258,7 @@ var View = function(collection, obj) {
       }
 
       if(_obj.options.limit) _obj.command.deletes[0]['limit'] = _obj.options.limit;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";      
     }    
@@ -269,6 +275,7 @@ var View = function(collection, obj) {
         }]
       }
 
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
       return "";      
     }    
@@ -290,6 +297,7 @@ var View = function(collection, obj) {
       }
 
       if(typeof _obj.upsert == 'boolean') _obj.command.updates[0]['upsert'] = _obj.upsert;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
     }
   }
@@ -311,6 +319,7 @@ var View = function(collection, obj) {
 
       if(typeof _obj.upsert == 'boolean') _obj.command.updates[0]['upsert'] = _obj.upsert;
       if(_obj.options.limit == 1) _obj.command.updates[0].multi = false;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];      
     }
   }
@@ -331,7 +340,37 @@ var View = function(collection, obj) {
       }
 
       if(typeof _obj.upsert == 'boolean') _obj.command.updates[0]['upsert'] = _obj.upsert;
+      if(_obj.writeConcern) _obj.command['writeConcern'] = _obj.writeConcern;
       for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];            
+    }
+  }
+
+  var writeConcern = function(_self, _obj) {
+    return function(_writeConcern) {
+      _obj.writeConcern = _writeConcern;
+      return {
+          addPredicate: addPredicate(_self, obj)
+        , addQueryModifier: addQueryModifier(_self, obj)
+        , batchSize: batchSize(_self, obj)
+        , comment: comment(_self, obj)
+        , distinct: distinct(_self, collection, obj)
+        , skip: skip(_self, obj)
+        , limit: limit(_self, obj)
+        , project: project(_self, obj)
+        , sort: sort(_self, obj)
+        , upsert: upsert(_self, obj)
+        , maxTimeMS: maxTimeMS(_self, obj)
+        // Terminating functions
+        , fetchOneThenRemove: fetchOneThenRemove(_self, collection, obj)
+        , fetchOneThenReplace: fetchOneThenReplace(_self, collection, obj)
+        , fetchOneThenUpdate: fetchOneThenUpdate(_self, collection, obj)
+        , remove: remove(_self, collection, obj)
+        , removeOne: removeOne(_self, collection, obj)
+        , replaceOneThenFetch: replaceOneThenFetch(_self, collection, obj)
+        , updateOneThenFetch: updateOneThenFetch(_self, collection, obj)
+        , updateOne: updateOne(_self, collection, obj)
+        , update: update(_self, collection, obj)
+      }
     }
   }
 
@@ -341,16 +380,19 @@ var View = function(collection, obj) {
   this.addQueryModifier = addQueryModifier(this, obj);
   this.batchSize = batchSize(this, obj);
   this.comment = comment(this, obj);
-  this.distinct = distinct(this, collection, obj);
   this.skip = skip(this, obj);
   this.limit = limit(this, obj);
   this.project = project(this, obj);
   this.sort = sort(this, obj);
+  this.upsert = upsert(this, obj);
+  this.maxTimeMS = maxTimeMS(this, obj);
+  this.writeConcern = writeConcern(this, obj);
+
+  // Terminators
+  this.distinct = distinct(this, collection, obj);
   this.fetchOneThenRemove = fetchOneThenRemove(this, collection, obj);
   this.fetchOneThenReplace = fetchOneThenReplace(this, collection, obj);
   this.fetchOneThenUpdate = fetchOneThenUpdate(this, collection, obj);
-  this.upsert = upsert(this, obj);
-  this.maxTimeMS = maxTimeMS(this, obj);
   this.remove = remove(this, collection, obj);
   this.removeOne = removeOne(this, collection, obj);
   this.replaceOne = replaceOne(this, collection, obj);
@@ -368,6 +410,18 @@ var View = function(collection, obj) {
 DBCollection.prototype.find = function(selector) {
   var query = {query: selector};
   return new View(this, query);
+}
+
+DBCollection.prototype.writeConcern = function(writeConcern) {
+  var self = this;
+
+  return {
+      find: function(selector) {
+        var query = {query: selector, writeConcern: writeConcern};
+        return new View(self, query);
+      }
+    , insert: DBCollection.prototype.insert
+  }
 }
 
 //
@@ -1152,7 +1206,6 @@ function updateOneThenFetch() {
   }
 
   function builds_the_correct_findAndModify_command_with_upsert() {
-    // print(JSON.stringify(query.toQuery(), null, 2))
     var query = db.fluent_api.find({x:2})
     query.project({x:1}).limit(1).sort({a:1}).upsert().updateOneThenFetch({$set:{a:2}});
     assert(JSON.stringify( {
@@ -1194,8 +1247,42 @@ function updateOneThenFetch() {
   throws_when_limit_other_than_1_was_specified();
 }
 
-function writeConcern() {  
+function writeConcern() {
+  function should_track_write_concern() {
+    var query = db.fluent_api.find({x:2});
+    query.writeConcern({w: "majority"}).updateOne({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: false,
+        upsert: false,
+      }],
+      writeConcern: {w: 'majority'}
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function should_initiate_with_write_concern() {
+    var query = db.fluent_api.writeConcern({w: "majority"}).find({x:2});
+    query.updateOne({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: false,
+        upsert: false,
+      }],
+      writeConcern: {w: 'majority'}
+    }) == JSON.stringify(query.toQuery().command));    
+  }
+
+  should_track_write_concern();
+  should_initiate_with_write_concern();
 }
+
+// print(JSON.stringify(query.toQuery().command, null, 2))
 
 //
 // Execute All Tests
