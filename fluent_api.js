@@ -73,6 +73,7 @@ var View = function(collection, obj) {
         , fetchOneThenReplace: fetchOneThenReplace(_self, collection, obj)
         , fetchOneThenUpdate: fetchOneThenUpdate(_self, collection, obj)
         , replaceOneThenFetch: replaceOneThenFetch(_self, collection, obj)
+        , updateOneThenFetch: updateOneThenFetch(_self, collection, obj)
         , upsert: upsert(_self, obj)
         , maxTimeMS: maxTimeMS(_self, obj)
       }
@@ -104,6 +105,7 @@ var View = function(collection, obj) {
       return {
           sort: sort(_self, _obj)
         , limit: limit(_self, _obj)
+        , skip: skip(_self, _obj)
         , maxTimeMS: maxTimeMS(_self, _obj)
       }
     }
@@ -122,6 +124,8 @@ var View = function(collection, obj) {
       if(_limit == 1) object['fetchOneThenReplace'] = fetchOneThenReplace(_self, collection, _obj);
       if(_limit == 1 || _limit == 0) object['remove'] = remove(_self, collection, _obj);
       if(_limit == 1) object['removeOne'] = removeOne(_self, collection, _obj);
+      if(_limit == 1) object['update'] = update(_self, collection, _obj);
+      if(_limit == 1) object['updateOneThenFetch'] = updateOneThenFetch(_self, collection, _obj);
       return object;
     }
   }
@@ -219,6 +223,25 @@ var View = function(collection, obj) {
     }    
   }
 
+  var updateOneThenFetch = function(_self, _collection, _obj) {
+    return function(doc) {      
+      validateUpdateDoc(doc);
+      // Build command
+      _obj.command = {
+          findAndModify: _collection._shortName
+        , query: _obj.query
+        , update: doc
+        , new: true
+      }
+
+      if(_obj.sort) _obj.command['sort'] = _obj.sort;
+      if(_obj.fields) _obj.command['fields'] = _obj.fields;
+      if(typeof _obj.upsert == 'boolean') _obj.command['upsert'] = _obj.upsert;
+      for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];
+      return "";      
+    }
+  }
+
   var remove = function(_self, _collection, _obj) {
     return function() {
       // Build command
@@ -271,6 +294,47 @@ var View = function(collection, obj) {
     }
   }
 
+  var update = function(_self, _collection, _obj) {
+    return function(doc) {
+      validateUpdateDoc(doc);
+
+      // Build command
+      _obj.command = {
+          update: _collection._shortName
+        , updates: [{
+            q: _obj.query
+          , u: doc
+          , multi: true
+          , upsert: false
+        }]
+      }
+
+      if(typeof _obj.upsert == 'boolean') _obj.command.updates[0]['upsert'] = _obj.upsert;
+      if(_obj.options.limit == 1) _obj.command.updates[0].multi = false;
+      for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];      
+    }
+  }
+
+  var updateOne = function(_self, _collection, _obj) {
+    return function(doc) {
+      validateUpdateDoc(doc);
+
+      // Build command
+      _obj.command = {
+          update: _collection._shortName
+        , updates: [{
+            q: _obj.query
+          , u: doc
+          , multi: false
+          , upsert: false
+        }]
+      }
+
+      if(typeof _obj.upsert == 'boolean') _obj.command.updates[0]['upsert'] = _obj.upsert;
+      for(var name in _obj.modifiers) _obj.command[name] = _obj.modifiers[name];            
+    }
+  }
+
   //
   // Initial state
   this.addPredicate = addPredicate(this, obj);
@@ -291,6 +355,9 @@ var View = function(collection, obj) {
   this.removeOne = removeOne(this, collection, obj);
   this.replaceOne = replaceOne(this, collection, obj);
   this.replaceOneThenFetch = replaceOneThenFetch(this, collection, obj);
+  this.updateOneThenFetch = updateOneThenFetch(this, collection,  obj);
+  this.update = update(this, collection, obj);
+  this.updateOne = updateOne(this, collection, obj);
 
   this.toQuery = function() {    
     return obj;
@@ -888,19 +955,243 @@ function replaceOneThenFetch() {
 }
 
 function skip() {  
-    // print(JSON.stringify(query.toQuery(), null, 2))
+  function should_track_skip() {
+    var query = db.fluent_api.find({x:2});
+    query.skip(2);
+    assert(query.toQuery().options.skip == 2);
+  }
+
+  function should_use_the_last_skip_specified() {
+    var query = db.fluent_api.find({x:2});
+    query.skip(2).skip(10);
+    assert(query.toQuery().options.skip == 10);
+  }
+
+  should_track_skip();
+  should_use_the_last_skip_specified();
 }
 
-function sort() { 
+function sort() {
+  function should_track_sort() {
+    var query = db.fluent_api.find({x:2});
+    query.sort({a:1});
+    assert(JSON.stringify({
+      a:1
+    }) == JSON.stringify(query.toQuery().sort));
+  } 
+
+  function should_use_the_latest_sort_specified() {
+    var query = db.fluent_api.find({x:2});
+    query.sort({a:1}).sort({b:1});
+    assert(JSON.stringify({
+      b:1
+    }) == JSON.stringify(query.toQuery().sort));
+  }
+
+  should_track_sort();
+  should_use_the_latest_sort_specified();
 }
 
 function update() {  
+  function builds_the_correct_update_command_without_upsert() {
+    var query = db.fluent_api.find({x:2})
+    query.update({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: true,
+        upsert: false
+      }]
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function builds_the_correct_update_command_with_upsert() {
+    var query = db.fluent_api.find({x:2})
+    query.upsert().update({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: true,
+        upsert: true
+      }]
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function builds_the_correct_update_command_with_limit() {
+    var query = db.fluent_api.find({x:2})
+    query.limit(1).update({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: false,
+        upsert: false
+      }]
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function throws_when_the_update_document_is_invalid() {
+    try {
+      db.fluent_api.find({x:2}).update({a:2});
+      assert(false, 'Should fail due to illegal document');
+    } catch(err) {}    
+  }
+
+  function throws_when_skip_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).skip(10).update({$set:{a:2}});
+      assert(false, 'Should fail due to skip');
+    } catch(err) {}    
+  }
+
+  function throws_when_sort_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).sort({a:2}).update({$set:{a:2}});
+      assert(false, 'Should fail due to limit == 2');
+    } catch(err) {}    
+  }
+
+  function throws_when_limit_other_than_1_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).limit(2).update({$set:{a:2}});
+      assert(false, 'Should fail due to limit == 2');
+    } catch(err) {}    
+  }
+
+  builds_the_correct_update_command_without_upsert();
+  builds_the_correct_update_command_with_upsert();
+  builds_the_correct_update_command_with_limit();
+  throws_when_the_update_document_is_invalid();
+  throws_when_skip_was_specified();
+  throws_when_sort_was_specified();
+  throws_when_limit_other_than_1_was_specified();
 }
 
 function updateOne() {  
+  function builds_the_correct_update_command_without_upsert() {
+    var query = db.fluent_api.find({x:2})
+    query.updateOne({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: false,
+        upsert: false
+      }]
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function builds_the_correct_update_command_with_upsert() {
+    var query = db.fluent_api.find({x:2})
+    query.upsert().updateOne({$set:{a:2}});
+    assert(JSON.stringify( {
+      update: "fluent_api",
+      updates: [{
+        q: {x:2},
+        u: {$set:{a:2}},
+        multi: false,
+        upsert: true
+      }]
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function throws_when_the_update_document_is_invalid() {
+    try {
+      db.fluent_api.find({x:2}).updateOne({a:2});
+      assert(false, 'Should fail due to illegal document');
+    } catch(err) {}    
+  }
+
+  function throws_when_skip_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).skip(10).updateOne({$set:{a:2}});
+      assert(false, 'Should fail due to skip');
+    } catch(err) {}    
+  }
+
+  function throws_when_sort_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).sort({a:2}).updateOne({$set:{a:2}});
+      assert(false, 'Should fail due to limit == 2');
+    } catch(err) {}    
+  }
+
+  function throws_when_limit_other_than_1_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).limit(2).updateOne({$set:{a:2}});
+      assert(false, 'Should fail due to limit == 2');
+    } catch(err) {}    
+  }
+
+  builds_the_correct_update_command_without_upsert();
+  builds_the_correct_update_command_with_upsert();
+  throws_when_the_update_document_is_invalid();
+  throws_when_skip_was_specified();
+  throws_when_sort_was_specified();
+  throws_when_limit_other_than_1_was_specified();
 }
 
 function updateOneThenFetch() {  
+  function builds_the_correct_findAndModify_command_without_upsert() {
+    var query = db.fluent_api.find({x:2})
+    query.project({x:1}).limit(1).sort({a:1}).updateOneThenFetch({$set:{a:2}});
+    assert(JSON.stringify( {
+      findAndModify: "fluent_api",
+      query: {x:2},
+      update: {$set:{a:2}},
+      new: true,
+      sort: {a:1},
+      fields: {x:1}
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function builds_the_correct_findAndModify_command_with_upsert() {
+    // print(JSON.stringify(query.toQuery(), null, 2))
+    var query = db.fluent_api.find({x:2})
+    query.project({x:1}).limit(1).sort({a:1}).upsert().updateOneThenFetch({$set:{a:2}});
+    assert(JSON.stringify( {
+      findAndModify: "fluent_api",
+      query: {x:2},
+      update: {$set:{a:2}},
+      new: true,
+      sort: {a:1},
+      fields: {x:1},
+      upsert: true
+    }) == JSON.stringify(query.toQuery().command));
+  }
+
+  function throws_when_the_update_document_is_invalid() {
+    try {
+      db.fluent_api.find({x:2}).updateOneThenFetch({a:2});
+      assert(false, 'Should fail due to illegal document');
+    } catch(err) {}    
+  }
+
+  function throws_when_skip_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).skip(10).updateOneThenFetch({$set:{a:2}});
+      assert(false, 'Should fail due to skip');
+    } catch(err) {}    
+  }
+
+  function throws_when_limit_other_than_1_was_specified() {
+    try {
+      db.fluent_api.find({x:2}).limit(2).updateOneThenFetch({$set:{a:2}});
+      assert(false, 'Should fail due to limit == 2');
+    } catch(err) {}    
+  }
+
+  builds_the_correct_findAndModify_command_without_upsert();
+  builds_the_correct_findAndModify_command_with_upsert();
+  throws_when_the_update_document_is_invalid();
+  throws_when_skip_was_specified();
+  throws_when_limit_other_than_1_was_specified();
 }
 
 function writeConcern() {  
