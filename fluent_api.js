@@ -401,10 +401,10 @@ var View = function(collection, obj, qfields , qlimit , qskip, qbatchSize, qopti
   this.update = update(this, collection, obj);
   this.updateOne = updateOne(this, collection, obj);
 
-  print("================================ COMMAND")
-  print(JSON.stringify(obj.query, null, 2))
-  print(_limit)
-  print(_batchSize)
+  // print("================================ COMMAND")
+  // print(JSON.stringify(obj.query, null, 2))
+  // print(qlimit)
+  // print(qbatchSize)
 
   // Build a cursor for backward compatibility
   var cursor = new DBQuery(
